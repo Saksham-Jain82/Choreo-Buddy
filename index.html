@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Choreobuddy - Dance Coach Dashboard</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#185adc",
+                        "primary-dark": "#1244a8",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#111621",
+                        "card-dark": "#1a2231",
+                        "border-dark": "#243047",
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "2xl": "1rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Manrope', sans-serif;
+        }
+        .pattern-bg {
+            background-image: radial-gradient(circle at 2px 2px, rgba(255,255,255,0.05) 1px, transparent 0);
+            background-size: 24px 24px;
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        .smooth-scroll {
+            scroll-behavior: smooth;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .animate-fadeIn { animation: fadeIn 0.3s ease-out forwards; }
+        .animate-slideUp { animation: slideUp 0.4s ease-out forwards; }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white font-display min-h-screen overflow-x-hidden transition-colors duration-300">
+
+<!-- Overlay for mobile sidebar -->
+<div id="mobile-overlay" onclick="toggleSidebar()" class="fixed inset-0 bg-black/50 z-40 hidden md:hidden backdrop-blur-sm transition-opacity cursor-pointer"></div>
+
+<!-- Camera Access Modal (Hidden by default) -->
+<div id="camera-modal" class="fixed inset-0 z-[60] hidden flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+    <div class="bg-white dark:bg-card-dark w-full max-w-lg rounded-2xl p-6 shadow-2xl animate-slideUp border border-slate-200 dark:border-border-dark relative">
+        <button onclick="closeModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-white">
+            <span class="material-symbols-outlined">close</span>
+        </button>
+        
+        <div class="text-center mb-6">
+            <div class="w-16 h-16 bg-red-100 dark:bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+                <span class="material-symbols-outlined text-3xl">videocam</span>
+            </div>
+            <h3 class="text-2xl font-bold mb-2">Setting up Studio</h3>
+            <p class="text-slate-500 dark:text-slate-400">Please stand back 6-8 feet for full body tracking.</p>
+        </div>
+
+        <div class="space-y-4 mb-8">
+            <div class="flex items-center gap-4 p-3 bg-slate-50 dark:bg-background-dark rounded-xl border border-slate-100 dark:border-border-dark">
+                <div class="text-green-500"><span class="material-symbols-outlined">check_circle</span></div>
+                <div class="flex-1">
+                    <div class="text-sm font-bold">Camera Detected</div>
+                    <div class="text-xs text-slate-500">System Default Camera</div>
+                </div>
+            </div>
+            <div class="flex items-center gap-4 p-3 bg-slate-50 dark:bg-background-dark rounded-xl border border-slate-100 dark:border-border-dark">
+                <div class="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                <div class="flex-1">
+                    <div class="text-sm font-bold">Calibrating AI Model...</div>
+                    <div class="text-xs text-slate-500">Loading skeletal tracking nodes</div>
+                </div>
+            </div>
+        </div>
+
+        <button onclick="closeModal()" class="w-full py-3 bg-primary hover:bg-primary-dark text-white rounded-xl font-bold transition-colors shadow-lg shadow-primary/25">
+            Cancel Session
+        </button>
+    </div>
+</div>
+
+<div class="flex h-screen overflow-hidden">
+    <!-- Sidebar Navigation -->
+    <aside id="sidebar" class="fixed md:relative inset-y-0 left-0 w-64 border-r border-slate-200 dark:border-border-dark flex flex-col justify-between p-6 bg-white dark:bg-background-dark z-50 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out shadow-xl md:shadow-none h-full">
+        <div class="flex flex-col gap-8">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="bg-primary p-2 rounded-lg flex items-center justify-center shadow-lg shadow-primary/30">
+                        <span class="material-symbols-outlined text-white text-2xl">auto_fix_high</span>
+                    </div>
+                    <div>
+                        <h1 class="text-lg font-bold leading-none">Choreobuddy</h1>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">AI Dance Coach</p>
+                    </div>
+                </div>
+                <button onclick="toggleSidebar()" class="md:hidden p-2 text-slate-400 hover:text-primary hover:bg-slate-100 dark:hover:bg-border-dark rounded-lg transition-colors">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            
+            <nav class="flex flex-col gap-2">
+                <a class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg bg-primary/10 text-primary cursor-pointer transition-all" href="index.html">
+                    <span class="material-symbols-outlined">dashboard</span>
+                    <span class="text-sm font-medium">Dashboard</span>
+                </a>
+                <!-- Updated: Linked to choreography.html -->
+                <a class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-border-dark cursor-pointer transition-colors" href="choregraphy.html">
+                    <span class="material-symbols-outlined">video_library</span>
+                    <span class="text-sm font-medium">Choreographies</span>
+                </a>
+                <a class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-border-dark cursor-pointer transition-colors" href="dancepractice.html">
+                    <span class="material-symbols-outlined">sports_martial_arts</span>
+                    <span class="text-sm font-medium">Dance Practice</span>
+                </a>
+                <a class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-border-dark cursor-pointer transition-colors" href="warmup.html">
+                    <span class="material-symbols-outlined">fitness_center</span>
+                    <span class="text-sm font-medium">Warmups</span>
+                </a>
+                <a class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-border-dark cursor-pointer transition-colors" href="#">
+                    <span class="material-symbols-outlined">robot_2</span>
+                    <span class="text-sm font-medium">AI Assistant</span>
+                </a>
+                <a class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-border-dark cursor-pointer transition-colors" href="#">
+                    <span class="material-symbols-outlined">monitoring</span>
+                    <span class="text-sm font-medium">Progress</span>
+                </a>
+                <a class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-border-dark cursor-pointer transition-colors" href="profile.html">
+                    <span class="material-symbols-outlined">person</span>
+                    <span class="text-sm font-medium">Profile</span>
+                </a>
+            </nav>
+        </div>
+        
+        <div class="flex flex-col gap-4 border-t border-slate-200 dark:border-border-dark pt-6">
+            <div class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-border-dark cursor-pointer transition-colors">
+                <span class="material-symbols-outlined">settings</span>
+                <span class="text-sm font-medium">Settings</span>
+            </div>
+            <div id="camera-status" class="flex items-center gap-3 p-3 bg-slate-100 dark:bg-card-dark rounded-xl border border-slate-200 dark:border-border-dark transition-colors">
+                <div class="bg-green-500 w-2 h-2 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div>
+                <span class="text-xs font-semibold uppercase tracking-wider">AI Camera Ready</span>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col overflow-y-auto pattern-bg h-screen relative">
+        <header class="sticky top-0 z-30 flex items-center justify-between px-4 md:px-8 py-4 bg-white/80 dark:bg-background-dark/90 backdrop-blur-md border-b border-slate-200 dark:border-border-dark">
+            <div class="flex items-center flex-1 gap-4">
+                <button onclick="toggleSidebar()" class="md:hidden p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-border-dark rounded-lg">
+                    <span class="material-symbols-outlined">menu</span>
+                </button>
+                <div class="flex-1 max-w-md hidden md:block">
+                    <div class="relative group">
+                        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors">search</span>
+                        <input id="searchInput" onkeyup="filterLessons()" class="w-full bg-slate-100 dark:bg-card-dark dark:border-border-dark border-transparent focus:border-primary rounded-lg pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-primary transition-all shadow-sm" placeholder="Search mudras, raags, or lessons..." type="text"/>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 md:gap-6">
+                <div class="flex items-center gap-1 md:gap-2">
+                    <button onclick="toggleTheme()" class="p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-border-dark rounded-lg transition-colors">
+                        <span class="material-symbols-outlined dark:hidden">dark_mode</span>
+                        <span class="material-symbols-outlined hidden dark:block">light_mode</span>
+                    </button>
+                    <button class="p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-border-dark rounded-lg transition-colors relative">
+                        <span class="material-symbols-outlined">notifications</span>
+                        <span class="absolute top-2 right-2 w-2 h-2 bg-red-500 border-2 border-white dark:border-background-dark rounded-full"></span>
+                    </button>
+                </div>
+                <div class="h-8 w-px bg-slate-200 dark:bg-border-dark mx-2"></div>
+                <div class="flex items-center gap-3">
+                    <div class="text-right hidden sm:block">
+                        <p class="text-sm font-bold leading-none">Anas</p>
+                        <p class="text-[10px] text-slate-500 uppercase tracking-tighter">Gold Tier Member</p>
+                    </div>
+                    <a href="profile.html" class="w-10 h-10 rounded-full border-2 border-primary overflow-hidden shadow-md hover:shadow-lg transition-shadow cursor-pointer">
+                        <img class="w-full h-full object-cover" alt="Profile" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBQFCJuQ9PVXqwgBI1U8g8bACRCPFC8EMesbbiIKs9JYD8eqUc6Fng8RZhMWu7EUhqmVCG8VrSb0Wr9EA62mmgqb9UuwslUfjobwM6VfjJvFfh13Kjg6i4_VBfxRQ6kJY4cjRp5yDyvPhM_hN8RUfQ25Wj3PpR0j6Cji0C6arygYDs6ZHw5BeaQ9rd6QXFzg6gMQ4eovUdRab_nuMsS5Pkcq1shgM6Cv3sbaOTYSUkfKMOl2exAZ0j0_9CxQ2c0VefQrDR4Sv_s8Rje"/>
+                    </a>
+                </div>
+            </div>
+        </header>
+
+        <div class="p-4 md:p-8 space-y-8 max-w-7xl mx-auto w-full pb-20">
+            <!-- Hero Section -->
+            <div class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#1e2a44] to-background-dark p-6 md:p-10 border border-white/5 shadow-2xl group">
+                <div class="relative z-10 max-w-2xl">
+                    <div class="inline-flex items-center gap-2 px-3 py-1 bg-primary/20 backdrop-blur-sm text-blue-200 border border-blue-500/30 rounded-full text-xs font-bold uppercase tracking-widest mb-4">
+                        <span class="material-symbols-outlined text-sm animate-pulse">stars</span> Daily Challenge
+                    </div>
+                    <h2 class="text-3xl md:text-5xl font-extrabold text-white mb-4 leading-tight">
+                        Namaste, Anas. <br/>Ready to refine your <span class="text-primary italic">Mudras</span>?
+                    </h2>
+                    <p class="text-slate-400 text-sm md:text-lg mb-8 max-w-lg">
+                        Your AI coach has prepared a new session focusing on the <span class="text-white font-semibold">Alarippu</span> sequence.
+                    </p>
+                    <div class="flex flex-col sm:flex-row items-center gap-4">
+                        <!-- Updated: Link to choreography library -->
+                        <a href="choregraphy.html" class="w-full sm:w-auto bg-primary hover:bg-primary-dark text-white px-8 py-3.5 rounded-xl font-bold transition-all transform hover:scale-105 flex items-center justify-center gap-2 shadow-lg shadow-primary/40">
+                            <span class="material-symbols-outlined">play_circle</span>
+                            Browse Choreographies
+                        </a>
+                        <button class="w-full sm:w-auto bg-white/5 hover:bg-white/10 text-white border border-white/10 px-6 py-3.5 rounded-xl font-bold transition-all">
+                            View Curriculum
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-white dark:bg-card-dark p-6 rounded-2xl border border-slate-200 dark:border-border-dark group">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-10 h-10 bg-blue-100 dark:bg-blue-500/10 rounded-lg flex items-center justify-center text-primary"><span class="material-symbols-outlined">schedule</span></div>
+                        <span class="text-green-500 text-xs font-bold bg-green-500/10 px-2 py-1 rounded-full">+2.4h</span>
+                    </div>
+                    <p class="text-slate-500 dark:text-slate-400 text-sm font-medium">Dance Hours</p>
+                    <h4 class="text-3xl font-black mt-1">12.5 <span class="text-sm font-normal text-slate-400">hrs</span></h4>
+                </div>
+                <div class="bg-white dark:bg-card-dark p-6 rounded-2xl border border-slate-200 dark:border-border-dark group">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-10 h-10 bg-purple-100 dark:bg-purple-500/10 rounded-lg flex items-center justify-center text-purple-500"><span class="material-symbols-outlined">fact_check</span></div>
+                        <span class="text-green-500 text-xs font-bold bg-green-500/10 px-2 py-1 rounded-full">+5%</span>
+                    </div>
+                    <p class="text-slate-500 dark:text-slate-400 text-sm font-medium">Posture Accuracy</p>
+                    <h4 class="text-3xl font-black mt-1">92 <span class="text-sm font-normal text-slate-400">%</span></h4>
+                </div>
+                <div class="bg-white dark:bg-card-dark p-6 rounded-2xl border border-slate-200 dark:border-border-dark group">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-10 h-10 bg-orange-100 dark:bg-orange-500/10 rounded-lg flex items-center justify-center text-orange-500"><span class="material-symbols-outlined">local_fire_department</span></div>
+                    </div>
+                    <p class="text-slate-500 dark:text-slate-400 text-sm font-medium">Practice Streak</p>
+                    <h4 class="text-3xl font-black mt-1">5 <span class="text-sm font-normal text-slate-400">days</span></h4>
+                </div>
+                <div class="bg-white dark:bg-card-dark p-6 rounded-2xl border border-slate-200 dark:border-border-dark group">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-10 h-10 bg-green-100 dark:bg-green-500/10 rounded-lg flex items-center justify-center text-green-500"><span class="material-symbols-outlined">workspace_premium</span></div>
+                    </div>
+                    <p class="text-slate-500 dark:text-slate-400 text-sm font-medium">Mastery Points</p>
+                    <h4 class="text-3xl font-black mt-1">2,840</h4>
+                </div>
+            </div>
+
+            <!-- Lessons Carousel -->
+            <div class="space-y-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xl font-bold">Continue Learning</h3>
+                    <div class="flex gap-2">
+                        <button onclick="scrollCarousel('left')" class="p-2 border border-slate-200 dark:border-border-dark rounded-full hover:bg-slate-100 transition-colors"><span class="material-symbols-outlined text-sm">chevron_left</span></button>
+                        <button onclick="scrollCarousel('right')" class="p-2 border border-slate-200 dark:border-border-dark rounded-full hover:bg-slate-100 transition-colors"><span class="material-symbols-outlined text-sm">chevron_right</span></button>
+                    </div>
+                </div>
+                <div id="lessonContainer" class="flex gap-6 overflow-x-auto pb-6 no-scrollbar smooth-scroll snap-x">
+                    <div class="lesson-card min-w-[300px] md:min-w-[340px] bg-white dark:bg-card-dark rounded-2xl border border-slate-200 dark:border-border-dark overflow-hidden snap-start" onclick="location.href='choregraphy.html'">
+                        <div class="relative h-44"><img class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDVdp2bryfs-nLK9uRIQfPV4TnZgyzOwgDjtHlwHuLj1sD7ISKEgrS3EkiSq1ktxJ8-s0M6YlQazxu2zWyNCMQct5CQZzIb5tGuCwhhA866sCNeTEvsRzjwuupt59ngxhDNuWYHwQI-GtS1PZo1qBkyKbNPnRd92JW1iURYXtNacXzwbfJUQo6Ti2I4oLygYSG7LKfiF8JdKqPqORjA2EBJU6SyT5sXGtvIGpPHHHr9z3hZkugFN4rtqDpjTgYmUMa37enCsK1Akv4x"/></div>
+                        <div class="p-5"><h4 class="font-bold text-lg">Bharatanatyam Adavus</h4><p class="text-sm text-slate-500">Araimandi posture and footwork synchronization.</p></div>
+                    </div>
+                    <div class="lesson-card min-w-[300px] md:min-w-[340px] bg-white dark:bg-card-dark rounded-2xl border border-slate-200 dark:border-border-dark overflow-hidden snap-start" onclick="location.href='choregraphy.html'">
+                        <div class="relative h-44"><img class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAqp2j67fpBTNpBFWoW1HIA_tZvXSi6z1LpSmkHmr3ZmRocA9OV7KI66brosL_9pFCv5UnWo6BbgomVv6DAR9j5yt0sg_6fVJltQW0frGqo4wOaRwKeNMuZ1iYzCIgOajchtCmDnMzXVP3Dvhn8mI7zYeJLFTf_AUMJmXElNnoV77GjxrMB6cqwUaJKMjooUlepH-Nq88WA51Ww5onf5HK0tqDEtROf4RF8fGgI0LR5KdlcdmBUVK-HF2XP-nVq-V22O-MR8L5UzRrR"/></div>
+                        <div class="p-5"><h4 class="font-bold text-lg">Kathak Chakkars</h4><p class="text-sm text-slate-500">Mastering precision spins and balance.</p></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+    function toggleTheme() { document.documentElement.classList.toggle('dark'); }
+    function toggleSidebar() {
+        const s = document.getElementById('sidebar');
+        const o = document.getElementById('mobile-overlay');
+        s.classList.toggle('-translate-x-full');
+        o.classList.toggle('hidden');
+    }
+    function scrollCarousel(dir) {
+        const c = document.getElementById('lessonContainer');
+        c.scrollBy({ left: dir === 'left' ? -350 : 350, behavior: 'smooth' });
+    }
+    function startSession() { document.getElementById('camera-modal').classList.remove('hidden'); }
+    function closeModal() { document.getElementById('camera-modal').classList.add('hidden'); }
+</script>
+</body>
+</html>

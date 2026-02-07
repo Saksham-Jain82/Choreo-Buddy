@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>NatyaAI Studio | Live AI Practice</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,FILL@0..1&display=swap" rel="stylesheet"/>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#ffd900",
+                        "background-dark": "#0a0a0a",
+                    },
+                    fontFamily: { "display": ["Inter", "sans-serif"] },
+                },
+            },
+        }
+    </script>
+    <style>
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .glass-panel { background: rgba(10, 10, 10, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255, 217, 0, 0.15); }
+        /* Skeleton must be mirrored to match the mirrored video */
+        #output_canvas { transform: scaleX(-1); } 
+        /* Mirrored video for natural "mirror" feel during practice */
+        #input_video { transform: scaleX(-1); object-fit: cover; }
+    </style>
+</head>
+<body class="bg-background-dark font-display text-white overflow-hidden">
+
+    <header class="flex items-center justify-between border-b border-white/10 px-6 py-3 bg-black z-50">
+        <div class="flex items-center gap-4 cursor-pointer" onclick="window.location.href='choregraphy.html'">
+            <h2 class="text-white text-lg font-bold uppercase tracking-widest">Choreo Buddy</h2>
+        </div>
+        <div class="flex items-center gap-6">
+            <div id="statusIndicator" class="flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/20 text-red-500 text-[10px] font-bold uppercase">
+                <span class="size-2 rounded-full bg-red-500 animate-pulse"></span> Camera Off
+            </div>
+            <button onclick="window.location.href='choregraphy.html'" class="bg-primary text-black px-4 py-2 rounded-lg text-sm font-bold hover:bg-yellow-400 transition-colors">Exit Session</button>
+        </div>
+    </header>
+
+    <main class="p-4 h-[calc(100vh-64px)] flex flex-col gap-4">
+        
+        <div class="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 relative min-h-0">
+            
+            <div class="relative rounded-2xl overflow-hidden border border-white/10 bg-zinc-900">
+                <div class="absolute top-4 left-4 z-10 bg-black/50 px-3 py-1 rounded-full text-[10px] font-bold text-primary uppercase">Master Pose</div>
+                
+                <img src="https://images.unsplash.com/photo-1547153760-18fc86324498?q=80&w=1200" 
+                     class="w-full h-full object-cover" 
+                     alt="Master Reference">
+
+                <div class="absolute bottom-4 left-4 right-4 glass-panel p-3 rounded-xl border-l-4 border-primary">
+                    <p class="text-sm font-medium">Current Goal: <span class="text-primary font-bold">Aramandi Stance & Right Arm Alignment</span></p>
+                </div>
+            </div>
+
+            <div class="relative rounded-2xl overflow-hidden border-2 border-primary/30 bg-black shadow-[0_0_40px_rgba(255,217,0,0.15)]">
+                <video id="input_video" class="absolute inset-0 w-full h-full opacity-100"></video>
+                
+                <canvas id="output_canvas" class="absolute inset-0 w-full h-full"></canvas>
+
+                <div id="feedbackBox" class="absolute top-1/2 right-8 -translate-y-1/2 hidden">
+                    <div class="bg-red-600 text-white px-6 py-3 rounded-xl font-black text-sm uppercase shadow-2xl animate-bounce border-2 border-white/20">
+                        Adjust Right Arm
+                    </div>
+                </div>
+
+                <div class="absolute top-6 left-6 flex items-center gap-4 glass-panel px-4 py-2 rounded-2xl">
+                    <div class="text-center">
+                        <p id="accuracyValue" class="text-3xl font-black text-primary leading-none">0%</p>
+                        <p class="text-[8px] uppercase font-bold text-white/50">Accuracy</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-4 h-20">
+            <div class="glass-panel rounded-xl p-3 flex items-center gap-4 border border-white/5">
+                <span class="material-symbols-outlined text-primary">visibility</span>
+                <div>
+                    <p class="text-white/40 text-[9px] uppercase font-bold tracking-tighter">AI Tracking</p>
+                    <p id="trackingStatus" class="text-sm font-bold">Body Detecting...</p>
+                </div>
+            </div>
+            <div id="postureCard" class="glass-panel rounded-xl p-3 flex items-center gap-4 transition-all duration-300">
+                <span id="postureIcon" class="material-symbols-outlined text-green-400">check_circle</span>
+                <div>
+                    <p class="text-white/40 text-[9px] uppercase font-bold tracking-tighter">Real-time Feedback</p>
+                    <p id="postureText" class="text-sm font-bold">Ready</p>
+                </div>
+            </div>
+            <div class="glass-panel rounded-xl p-3 flex items-center gap-4 border border-white/5">
+                <span class="material-symbols-outlined text-blue-400">timer</span>
+                <div>
+                    <p class="text-white/40 text-[9px] uppercase font-bold tracking-tighter">Session Time</p>
+                    <p id="sessionClock" class="text-sm font-bold">00:00</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const videoElement = document.getElementById('input_video');
+        const canvasElement = document.getElementById('output_canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+        const feedbackBox = document.getElementById('feedbackBox');
+        const accuracyText = document.getElementById('accuracyValue');
+
+        // Logic: Calculate angle to verify elbow position
+        function calculateAngle(a, b, c) {
+            const radians = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
+            let angle = Math.abs((radians * 180.0) / Math.PI);
+            if (angle > 180.0) angle = 360 - angle;
+            return angle;
+        }
+
+        function onResults(results) {
+            canvasElement.width = videoElement.videoWidth;
+            canvasElement.height = videoElement.videoHeight;
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+            if (results.poseLandmarks) {
+                document.getElementById('statusIndicator').innerHTML = `<span class="size-2 rounded-full bg-green-500 animate-pulse"></span> Tracking Live`;
+                document.getElementById('trackingStatus').innerText = "Skeleton Locked";
+
+                // MediaPipe Pose Indices: 12 (R Shoulder), 14 (R Elbow), 16 (R Wrist)
+                const sR = results.poseLandmarks[12];
+                const eR = results.poseLandmarks[14];
+                const wR = results.poseLandmarks[16];
+
+                const currentAngle = calculateAngle(sR, eR, wR);
+                const targetAngle = 90; // Target for Bharatanatyam Varnam pose
+                const diff = Math.abs(currentAngle - targetAngle);
+
+                let score = Math.max(0, 100 - (diff * 1.5));
+                accuracyText.innerText = `${Math.floor(score)}%`;
+
+                const isIncorrect = diff > 20; // 20-degree tolerance
+                if (isIncorrect) {
+                    feedbackBox.classList.remove('hidden');
+                    document.getElementById('postureCard').style.borderColor = "#ef4444";
+                    document.getElementById('postureText').innerText = "Right Arm Too High/Low";
+                    document.getElementById('postureIcon').innerText = "error";
+                    document.getElementById('postureIcon').classList.replace('text-green-400', 'text-red-500');
+                } else {
+                    feedbackBox.classList.add('hidden');
+                    document.getElementById('postureCard').style.borderColor = "rgba(255, 217, 0, 0.4)";
+                    document.getElementById('postureText').innerText = "Perfect Form";
+                    document.getElementById('postureIcon').innerText = "check_circle";
+                    document.getElementById('postureIcon').classList.replace('text-red-500', 'text-green-400');
+                }
+
+                // DRAW SKELETON
+                drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTIONS,
+                    {color: isIncorrect ? '#ff0000' : '#ffd900', lineWidth: 4});
+                drawLandmarks(canvasCtx, results.poseLandmarks,
+                    {color: '#ffffff', lineWidth: 1, radius: 3});
+            }
+            canvasCtx.restore();
+        }
+
+        // Initialize Pose
+        const pose = new Pose({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+        });
+        pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+        pose.onResults(onResults);
+
+        // Initialize Camera
+        const camera = new Camera(videoElement, {
+            onFrame: async () => { await pose.send({image: videoElement}); },
+            width: 1280, height: 720
+        });
+        camera.start();
+
+        // Session Timer
+        let seconds = 0;
+        setInterval(() => {
+            seconds++;
+            const m = Math.floor(seconds/60).toString().padStart(2, '0');
+            const s = (seconds%60).toString().padStart(2, '0');
+            document.getElementById('sessionClock').innerText = `${m}:${s}`;
+        }, 1000);
+    </script>
+</body>
+</html>
