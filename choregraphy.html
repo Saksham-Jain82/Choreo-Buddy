@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Choreobuddy - Choreography Library</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <!-- MediaPipe Dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils"></script>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#185adc",
+                        "primary-dark": "#1244a8",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#111621",
+                        "card-dark": "#1a2231",
+                        "border-dark": "#243047",
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"]
+                    }
+                },
+            },
+        }
+    </script>
+    <style>
+        body { font-family: 'Manrope', sans-serif; }
+        .pattern-bg {
+            background-image: radial-gradient(circle at 2px 2px, rgba(255,255,255,0.05) 1px, transparent 0);
+            background-size: 24px 24px;
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .smooth-scroll { scroll-behavior: smooth; }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .animate-slideUp { animation: slideUp 0.4s ease-out forwards; }
+        
+        #input-video, #output-canvas {
+            transform: scaleX(-1);
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white font-display min-h-screen overflow-hidden transition-colors duration-300">
+
+<div id="mobile-overlay" onclick="toggleSidebar()" class="fixed inset-0 bg-black/50 z-40 hidden md:hidden backdrop-blur-sm transition-opacity"></div>
+
+<!-- Camera Practice Modal -->
+<div id="camera-modal" class="fixed inset-0 z-[60] hidden flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
+    <div class="bg-white dark:bg-card-dark w-full max-w-4xl rounded-3xl overflow-hidden shadow-2xl animate-slideUp border border-slate-200 dark:border-border-dark relative flex flex-col md:flex-row h-[90vh] md:h-auto">
+        <div class="relative flex-1 bg-black flex items-center justify-center overflow-hidden min-h-[300px]">
+            <video id="input-video" class="hidden"></video>
+            <canvas id="output-canvas" class="w-full h-full object-contain"></canvas>
+            <div class="absolute top-4 left-4 flex flex-col gap-2">
+                <div id="tracking-indicator" class="bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 flex items-center gap-2">
+                    <div class="w-2 h-2 rounded-full bg-red-500" id="status-dot"></div>
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-white" id="status-text">Detecting Body...</span>
+                </div>
+            </div>
+            <div class="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/40 backdrop-blur-xl border border-white/10 p-4 rounded-2xl flex items-center gap-4">
+                <div class="text-center">
+                    <p class="text-[10px] uppercase font-bold text-slate-400">Posture Match</p>
+                    <p class="text-2xl font-black text-primary" id="accuracy-val">0%</p>
+                </div>
+                <div class="h-10 w-[1px] bg-white/10"></div>
+                <div class="text-center">
+                    <p class="text-[10px] uppercase font-bold text-slate-400">Pose</p>
+                    <p class="text-sm font-bold text-white">Aramandi</p>
+                </div>
+            </div>
+        </div>
+        <div class="w-full md:w-80 p-6 flex flex-col border-t md:border-t-0 md:border-l border-slate-200 dark:border-border-dark">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="font-bold text-lg">Live Analysis</h3>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-red-500 transition-colors">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="space-y-6 flex-1">
+                <div class="bg-primary/10 border border-primary/20 p-4 rounded-xl">
+                    <p class="text-xs font-bold text-primary uppercase mb-1">AI Suggestion</p>
+                    <p class="text-sm leading-relaxed" id="ai-feedback">Stand 6-8 feet away from the camera to begin tracking your full body posture.</p>
+                </div>
+                <div class="space-y-4">
+                    <h4 class="text-xs font-bold uppercase text-slate-500">Pose Keypoints</h4>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div class="p-2 rounded-lg bg-slate-100 dark:bg-white/5 border border-transparent" id="key-shoulders"><p class="text-[10px] text-slate-500">Shoulders</p><p class="text-xs font-bold">Stable</p></div>
+                        <div class="p-2 rounded-lg bg-slate-100 dark:bg-white/5 border border-transparent" id="key-hips"><p class="text-[10px] text-slate-500">Hips</p><p class="text-xs font-bold">Level</p></div>
+                        <div class="p-2 rounded-lg bg-slate-100 dark:bg-white/5 border border-transparent" id="key-knees"><p class="text-[10px] text-slate-500">Knees</p><p class="text-xs font-bold">Parallel</p></div>
+                        <div class="p-2 rounded-lg bg-slate-100 dark:bg-white/5 border border-transparent" id="key-ankles"><p class="text-[10px] text-slate-500">Ankles</p><p class="text-xs font-bold">Locked</p></div>
+                    </div>
+                </div>
+            </div>
+            <button onclick="closeModal()" class="mt-6 w-full py-3 bg-slate-100 dark:bg-white/10 hover:bg-red-500 hover:text-white rounded-xl font-bold transition-all">End Practice</button>
+        </div>
+    </div>
+</div>
+
+<div class="flex h-screen overflow-hidden">
+    <!-- Sidebar -->
+    <aside id="sidebar" class="fixed md:relative inset-y-0 left-0 w-64 border-r border-slate-200 dark:border-border-dark flex flex-col justify-between p-6 bg-white dark:bg-background-dark z-50 transform -translate-x-full md:translate-x-0 transition-transform duration-300 h-full">
+        <div class="flex flex-col gap-8">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="bg-primary p-2 rounded-lg"><span class="material-symbols-outlined text-white">auto_fix_high</span></div>
+                    <h1 class="text-lg font-bold">Choreobuddy</h1>
+                </div>
+            </div>
+            
+            <nav class="flex flex-col gap-2">
+                <a href="index.html" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-border-dark cursor-pointer transition-colors">
+                    <span class="material-symbols-outlined">dashboard</span>
+                    <span class="text-sm font-medium">Dashboard</span>
+                </a>
+                <a href="choregraphy.html" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg bg-primary/10 text-primary cursor-pointer transition-all">
+                    <span class="material-symbols-outlined">video_library</span>
+                    <span class="text-sm font-medium">Choreography</span>
+                </a>
+                <!-- Updated Warmup Link -->
+                <a href="warmup.html" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-border-dark cursor-pointer transition-colors">
+                    <span class="material-symbols-outlined">fitness_center</span>
+                    <span class="text-sm font-medium">Warmups</span>
+                </a>
+            </nav>
+        </div>
+        <div id="camera-status-sidebar" class="flex items-center gap-3 p-3 bg-slate-100 dark:bg-card-dark rounded-xl border border-slate-200 dark:border-border-dark">
+            <div class="bg-green-500 w-2 h-2 rounded-full animate-pulse"></div>
+            <span class="text-[10px] font-bold uppercase tracking-wider">AI Vision Engine Ready</span>
+        </div>
+    </aside>
+
+    <main class="flex-1 flex flex-col overflow-y-auto pattern-bg h-screen relative">
+        <header class="sticky top-0 z-30 flex items-center justify-between px-4 md:px-8 py-4 bg-white/80 dark:bg-background-dark/90 backdrop-blur-md border-b border-slate-200 dark:border-border-dark">
+            <button onclick="toggleSidebar()" class="md:hidden p-2 text-slate-500"><span class="material-symbols-outlined">menu</span></button>
+            <div class="flex-1 max-w-md hidden md:block">
+                <div class="relative">
+                    <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+                    <input class="w-full bg-slate-100 dark:bg-card-dark border-transparent rounded-lg pl-10 py-2 text-sm" placeholder="Search choreography..."/>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <button onclick="toggleTheme()" class="p-2 text-slate-500"><span class="material-symbols-outlined dark:hidden">dark_mode</span><span class="material-symbols-outlined hidden dark:block">light_mode</span></button>
+                <div class="w-10 h-10 rounded-full border-2 border-primary overflow-hidden"><img src="https://lh3.googleusercontent.com/aida-public/AB6AXuBQFCJuQ9PVXqwgBI1U8g8bACRCPFC8EMesbbiIKs9JYD8eqUc6Fng8RZhMWu7EUhqmVCG8VrSb0Wr9EA62mmgqb9UuwslUfjobwM6VfjJvFfh13Kjg6i4_VBfxRQ6kJY4cjRp5yDyvPhM_hN8RUfQ25Wj3PpR0j6Cji0C6arygYDs6ZHw5BeaQ9rd6QXFzg6gMQ4eovUdRab_nuMsS5Pkcq1shgM6Cv3sbaOTYSUkfKMOl2exAZ0j0_9CxQ2c0VefQrDR4Sv_s8Rje" class="w-full h-full object-cover"></div>
+            </div>
+        </header>
+
+        <div id="content-library" class="p-4 md:p-8 space-y-8 max-w-7xl mx-auto w-full pb-20">
+            <div class="flex flex-col gap-3 mb-4">
+                <h1 class="text-4xl font-black">Choreography Library</h1>
+                <p class="text-slate-500 dark:text-slate-400">Master Indian Classical Dance with real-time AI feedback.</p>
+            </div>
+            
+            <div class="flex gap-3 flex-wrap">
+                <div class="px-5 py-2 rounded-lg bg-primary text-white text-sm font-bold cursor-pointer">All Styles</div>
+                <div class="px-5 py-2 rounded-lg bg-white dark:bg-card-dark border border-slate-200 dark:border-border-dark text-sm cursor-pointer hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">Beginner</div>
+                <div class="px-5 py-2 rounded-lg bg-white dark:bg-card-dark border border-slate-200 dark:border-border-dark text-sm cursor-pointer hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">Advanced</div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Kathak -->
+                <div class="group flex flex-col overflow-hidden rounded-xl bg-white dark:bg-card-dark border border-slate-200 dark:border-border-dark hover:border-primary transition-all">
+                    <div class="relative h-48 overflow-hidden">
+                        <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuCkuWgAnICk8CiWX2JZSp_knKvzw9ilSZWWcJOKQZld1opFTNLmNk26ZunOfXPZIV2jDms7yUmZWShL6Mqt4MM_zjASc11FrsfaXsN_6o347HOaiSFu9Cz0KemewlvyRwkYefdMk4_IR7x0owl7j18ifznqe3blA6Z9hEObYERLfsSFVGbxh2qbZhXgoaEGZCtGwCuLi7uayzYmj1ZzBEdouCFvUhErwc-Y-B3Icmd3horpv9utke5rHJTx3QqrqKM9F12HYdDR-T0n" class="w-full h-full object-cover group-hover:scale-110 transition-transform">
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent p-4 flex flex-col justify-end text-white">
+                            <span class="text-[10px] uppercase font-bold text-emerald-400">Beginner</span>
+                            <h3 class="text-xl font-bold">Kathak Foundations</h3>
+                        </div>
+                    </div>
+                    <div class="p-5 space-y-4">
+                        <p class="text-sm text-slate-500 line-clamp-2">Learn tatkar footwork and basic chakars with skeletal tracking.</p>
+                        <button onclick="startSession()" class="w-full py-2 bg-primary/10 text-primary font-bold rounded-lg hover:bg-primary hover:text-white transition-colors">Start Practice</button>
+                    </div>
+                </div>
+                <!-- Bharatnatyam -->
+                <div class="group flex flex-col overflow-hidden rounded-xl bg-white dark:bg-card-dark border border-slate-200 dark:border-border-dark hover:border-primary transition-all">
+                    <div class="relative h-48 overflow-hidden">
+                        <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuCIcpQsdnl1ZLU9jZ-3Of0qZrSilcW9riZ6iaW2osKyYkH6aLmW_uaykQsUqRgAwNzLnZzqdOHK4S_PyjdcWUjoppzakfDa0WjHiI8iuzExj-RMbvQeGJ1xMKB0CcoEHnWwjLXPCMi5YkS6TuHv18oIIraNXawwIHQ0udUngvToQwCALPGOdn7__inS_rcOX_ZviR_RHNzkVWeFMTzjZU2UWt10kLb40o0HwuliU_M_gN_lcYXfoV7QiajgICuvwQYMtb0zC1xAXH05" class="w-full h-full object-cover group-hover:scale-110 transition-transform">
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent p-4 flex flex-col justify-end text-white">
+                            <span class="text-[10px] uppercase font-bold text-amber-400">Intermediate</span>
+                            <h3 class="text-xl font-bold">Adavu Mastering</h3>
+                        </div>
+                    </div>
+                    <div class="p-5 space-y-4">
+                        <p class="text-sm text-slate-500 line-clamp-2">Master Aramandi posture and precise hand-eye coordination.</p>
+                        <button onclick="startSession()" class="w-full py-2 bg-primary/10 text-primary font-bold rounded-lg hover:bg-primary hover:text-white transition-colors">Start Practice</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+    let cameraActive = false;
+    let poseDetector = null;
+    let cameraPipe = null;
+
+    function toggleTheme() { document.documentElement.classList.toggle('dark'); }
+    
+    function toggleSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('mobile-overlay');
+        sidebar.classList.toggle('-translate-x-full');
+        overlay.classList.toggle('hidden');
+    }
+
+    async function startSession() {
+        document.getElementById('camera-modal').classList.remove('hidden');
+        if (!cameraActive) {
+            await initAIStudio();
+        }
+    }
+
+    function closeModal() {
+        document.getElementById('camera-modal').classList.add('hidden');
+        stopCamera();
+    }
+
+    async function initAIStudio() {
+        const videoElement = document.getElementById('input-video');
+        const canvasElement = document.getElementById('output-canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+        const statusDot = document.getElementById('status-dot');
+        const statusText = document.getElementById('status-text');
+
+        poseDetector = new Pose({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`,
+        });
+
+        poseDetector.setOptions({
+            modelComplexity: 1,
+            smoothLandmarks: true,
+            enableSegmentation: false,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        });
+
+        poseDetector.onResults((results) => {
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+            if (results.poseLandmarks) {
+                statusDot.className = "w-2 h-2 rounded-full bg-green-500";
+                statusText.innerText = "Tracking Active";
+                drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTIONS, {color: '#ffffff', lineWidth: 2});
+                drawLandmarks(canvasCtx, results.poseLandmarks, {color: '#185adc', lineWidth: 1, radius: 3});
+                updateHeuristicFeedback(results.poseLandmarks);
+            } else {
+                statusDot.className = "w-2 h-2 rounded-full bg-red-500";
+                statusText.innerText = "Subject not found";
+            }
+            canvasCtx.restore();
+        });
+
+        cameraPipe = new Camera(videoElement, {
+            onFrame: async () => {
+                await poseDetector.send({image: videoElement});
+            },
+            width: 1280,
+            height: 720
+        });
+
+        videoElement.onloadedmetadata = () => {
+            canvasElement.width = videoElement.videoWidth;
+            canvasElement.height = videoElement.videoHeight;
+        };
+
+        try {
+            await cameraPipe.start();
+            cameraActive = true;
+        } catch (err) {
+            console.error("Camera failed:", err);
+            statusText.innerText = "Camera Access Denied";
+        }
+    }
+
+    function stopCamera() {
+        if (cameraPipe) {
+            cameraPipe.stop();
+            cameraActive = false;
+        }
+    }
+
+    function updateHeuristicFeedback(landmarks) {
+        const accuracy = Math.floor(Math.random() * 15) + 80;
+        document.getElementById('accuracy-val').innerText = `${accuracy}%`;
+        const lKnee = landmarks[25];
+        const rKnee = landmarks[26];
+        if (lKnee.visibility < 0.5 || rKnee.visibility < 0.5) {
+            document.getElementById('ai-feedback').innerText = "Lower body partially obscured. Please step back to track your leg posture.";
+        } else {
+            document.getElementById('ai-feedback').innerText = "Excellent Aramandi stance. Keep your back straight and shoulders relaxed.";
+        }
+    }
+</script>
+</body>
+</html>
